@@ -67,6 +67,17 @@ def detect_source(code: str) -> str:
     for pattern, source in _SOURCE_PATTERNS:
         if pattern.match(code):
             return source
+    # Chinese futures contracts (SR2701, rb2410.SHFE, IF0, ...) are served free
+    # by akshare's token-free Sina endpoints. The regex table above cannot carry
+    # them: a bare product+delivery code is only distinguishable from a global
+    # contract by the product whitelist that lives in _is_china_futures. Without
+    # this branch the symbol fell through to the tushare default, auto mode then
+    # preferred the chain containing tushare (A-share), the futures chain never
+    # ran, and the contract came back _unresolved.
+    from backtest.engines._market_hooks import _is_china_futures
+
+    if _is_china_futures(code):
+        return "akshare"
     return "tushare"
 
 

@@ -37,6 +37,47 @@ from src.market_data import FIAT_CODES, canonical_fx_pair
 # fiat-pair canonicalizer (search, fetch and grounding share one definition).
 _canonical_fx_pair = canonical_fx_pair
 
+# China futures venues: contract suffix -> venue label reported in the search
+# envelope. CZCE/CZC are accepted spellings of Zhengzhou, mirroring
+# backtest.engines._market_hooks._EXCHANGE_ALIASES.
+_CHINA_FUTURES_EXCHANGE_BY_SUFFIX = {
+    "ZCE": "ZCE",
+    "CZCE": "ZCE",
+    "CZC": "ZCE",
+    "SHFE": "SHFE",
+    "SHF": "SHFE",
+    "DCE": "DCE",
+    "CFFEX": "CFFEX",
+    "CFX": "CFFEX",
+    "INE": "INE",
+    "GFEX": "GFEX",
+    "GFE": "GFEX",
+}
+
+
+def _china_futures_query(query: str) -> str | None:
+    """Return the canonical CN futures code when the query is one, else None.
+
+    Chinese futures are absent from every provider this tool fans out to
+    (eastmoney, Yahoo, ccxt), so a contract query matched nothing and the
+    grounding ledger could never lock an identity for it. The contract code
+    itself is an exact instrument assertion, so it resolves deterministically
+    here without a network call.
+    """
+    from backtest.engines._market_hooks import _is_china_futures
+
+    text = str(query or "").strip().upper()
+    if not text or any(ch.isspace() for ch in text):
+        return None
+    return text if _is_china_futures(text) else None
+
+
+def _china_futures_exchange(contract: str) -> str:
+    """Return the venue label for a CN futures contract code."""
+    _, _, suffix = contract.rpartition(".")
+    return _CHINA_FUTURES_EXCHANGE_BY_SUFFIX.get(suffix.upper(), "CN")
+
+
 logger = logging.getLogger(__name__)
 
 # Eastmoney's free, no-auth suggest endpoint (the same one the quote site calls)
@@ -314,6 +355,29 @@ class SymbolSearchTool(BaseTool):
                 for candidate in candidates
                 if str(candidate.get("symbol") or "").strip().upper()
                 == query.strip().upper()
+            ]
+
+        china_futures = _china_futures_query(query)
+        if china_futures is not None:
+            # A contract code is an exact instrument assertion: append the
+            # deterministic candidate and drop near-string provider hits, the
+            # same way the crypto / FX / =F branches above do.
+            candidates.append(
+                {
+                    "symbol": china_futures,
+                    "name": china_futures,
+                    "market": "futures",
+                    "type": "future",
+                    "exchange": _china_futures_exchange(china_futures),
+                    "source": "china_futures",
+                }
+            )
+            sources["china_futures"] = "ok"
+            candidates = [
+                candidate
+                for candidate in candidates
+                if str(candidate.get("symbol") or "").strip().upper().split(".")[0]
+                == china_futures.split(".")[0]
             ]
 
         # Canada fail-fast: a Canadian ticker must resolve to the Canadian venue

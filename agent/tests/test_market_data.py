@@ -64,6 +64,16 @@ from src.market_data import (
         ("^SPX", "yahoo"),  # index (S&P 500)
         ("^FTSE", "yahoo"),  # index (FTSE 100)
         ("^VIX", "yahoo"),
+        # China futures (CZCE/SHFE/DCE/CFFEX/INE/GFEX) are served free by
+        # akshare's token-free Sina endpoints. Before this branch they fell
+        # through to the ``tushare`` default and auto mode walked the A-share
+        # chain, so a CZCE contract came back ``_unresolved`` instead of bars.
+        ("SR2701", "akshare"),  # bare CZCE product+delivery (sugar)
+        ("SR2701.ZCE", "akshare"),  # explicit CZCE suffix
+        ("SR2701.CZCE", "akshare"),  # CZCE spelled out (exchange alias)
+        ("rb2410.SHFE", "akshare"),  # SHFE rebar, lowercase product
+        ("IF2512.CFFEX", "akshare"),  # CFFEX index future
+        ("MA0", "akshare"),  # CZCE main-continuous contract
         ("something_weird", "tushare"),  # documented fallback
     ],
 )
@@ -184,6 +194,55 @@ def test_fetch_market_data_auto_routes_yahoo_suffix_symbols() -> None:
     assert all(code in out for code in ("GC=F", "EURUSD=X", "TD.TO", "PNG.V"))
     # First source tried must be yahoo (not tushare/akshare from the China chain).
     assert seen_sources and seen_sources[0] == "yahoo"
+
+
+def test_czce_suffix_aliases_to_zhengzhou_futures() -> None:
+    """SR2701.CZCE must classify as futures (CNY), not fall to the a_share default."""
+    from backtest.engines._market_hooks import (
+        _detect_market,
+        _is_china_futures,
+        code_currency,
+    )
+
+    assert _detect_market("SR2701.CZCE") == "futures"
+    assert _is_china_futures("SR2701.CZCE") is True
+    assert code_currency("SR2701.CZCE") == "CNY"
+
+
+def test_fetch_market_data_auto_routes_china_futures_to_akshare() -> None:
+    """auto mode groups a CN futures contract under akshare, not the A-share chain.
+
+    Regression: ``detect_source`` had no China-futures rule, so ``SR2701.ZCE``
+    fell to the ``tushare`` default; ``_chain_for`` then preferred the chain
+    that contains ``tushare`` (A-share), the futures chain never ran, and the
+    symbol came back under ``_unresolved`` even though akshare serves it.
+    """
+    seen_sources: list[str] = []
+
+    class _StubLoader:
+        def fetch(self, codes, start, end, *, interval="1D"):  # noqa: ANN001
+            index = pd.DatetimeIndex(pd.to_datetime(["2026-01-02"]))
+            return {
+                code: pd.DataFrame({"close": [1.0]}, index=index)
+                for code in codes
+            }
+
+    def _resolver(source: str):
+        seen_sources.append(source)
+        return _StubLoader
+
+    out = fetch_market_data(
+        codes=["SR2701.ZCE"],
+        start_date="2026-01-01",
+        end_date="2026-01-03",
+        source="auto",
+        loader_resolver=_resolver,
+    )
+
+    assert "_unresolved" not in out
+    assert "SR2701.ZCE" in out
+    # The futures chain head (akshare) must be tried first.
+    assert seen_sources and seen_sources[0] == "akshare"
 
 
 # --------------------------------------------------------------------------

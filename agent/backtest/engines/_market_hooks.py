@@ -82,7 +82,7 @@ _MARKET_PATTERNS = [
     (re.compile(r"^[A-Z]{2,}(?:USDT|USDC|BUSD)$", re.I), "crypto"),
     # China futures: product+delivery.exchange (e.g. IF2406.CFFEX, rb2410.SHFE)
     # Tushare suffix spellings (SHF/CZC/CFX/GFE) classify here too.
-    (re.compile(r"^[A-Za-z]{1,2}\d{3,4}\.(ZCE|DCE|SHFE|INE|CFFEX|GFEX|SHF|CZC|CFX|GFE)$", re.I), "futures"),
+    (re.compile(r"^[A-Za-z]{1,2}\d{3,4}\.(ZCE|CZCE|DCE|SHFE|INE|CFFEX|GFEX|SHF|CZC|CFX|GFE)$", re.I), "futures"),
     # Global futures: product+month-code (e.g. ESZ4, CLF25, GCM2025)
     (re.compile(r"^[A-Z]{2,4}[FGHJKMNQUVXZ]\d{1,2}$", re.I), "futures"),
     # Global futures: product+YYMM (e.g. CL2412, ES2503)
@@ -150,7 +150,17 @@ _CHINA_EXCHANGES = {"CFFEX", "SHFE", "DCE", "ZCE", "INE", "GFEX"}
 
 # Tushare spells the same exchanges differently (ts_code='CU1811.SHF');
 # normalize to the canonical suffix before any set membership test (#1394).
-_EXCHANGE_ALIASES = {"SHF": "SHFE", "CZC": "ZCE", "CFX": "CFFEX", "GFE": "GFEX"}
+# CZCE is the spelling users and most external sources use for Zhengzhou;
+# the project canonicalizes on ZCE. It was absent from both this map and
+# _MARKET_PATTERNS above, so SR2701.CZCE fell to the a_share default and the
+# futures loader never saw it.
+_EXCHANGE_ALIASES = {
+    "SHF": "SHFE",
+    "CZC": "ZCE",
+    "CZCE": "ZCE",
+    "CFX": "CFFEX",
+    "GFE": "GFEX",
+}
 
 # Supported settlement-currency contract per market. A composite backtest holds
 # one shared capital pool, so a code set spanning two of these would add CNY to

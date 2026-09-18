@@ -364,6 +364,98 @@ def test_bare_ticker_stays_blocked_when_it_names_more_than_one_identity(
 
 
 @pytest.mark.parametrize(
+    "symbol",
+    [
+        "SR2701.ZCE",  # CZCE sugar, explicit venue suffix
+        "SR2701.CZCE",  # CZCE spelled out (exchange alias)
+        "rb2410.SHFE",  # SHFE rebar, lowercase product
+        "IF2512.CFFEX",  # CFFEX index future
+    ],
+)
+def test_china_futures_symbol_is_seeded_as_a_locked_identity(
+    tmp_path: Path,
+    symbol: str,
+) -> None:
+    """A CN futures contract in the prompt locks identity without search_symbol.
+
+    Regression: the canonical-symbol regex had no China-futures branch and
+    search_symbol has no CN-futures source, so identity could never lock and
+    authorize_tool_call rejected every get_market_data call for the contract
+    with identity_conflict - even though akshare serves the data.
+    """
+    ledger = GroundingLedger(
+        run_dir=tmp_path,
+        user_message=f"分析 {symbol} 的日线行情",
+    )
+
+    assert ledger.identity_status == "locked"
+    assert symbol.upper() in ledger.authorized_symbols
+
+    authorization = ledger.authorize_tool_call(
+        "get_market_data",
+        {"codes": [symbol]},
+        batch_authorized_symbols=ledger.authorized_symbols,
+        call_id="prices",
+    )
+
+    assert authorization.allowed is True
+
+
+def test_china_futures_resolver_result_locks_and_authorizes(
+    tmp_path: Path,
+) -> None:
+    """The search_symbol result for a CN futures code locks identity.
+
+    This is the exact seam that failed: search returned 0 candidates, so the
+    ledger recorded not_found/invalidated and authorize_tool_call rejected
+    get_market_data with identity_conflict.
+    """
+    import json as _json
+
+    result = _json.dumps(
+        {
+            "ok": True,
+            "market": "multi",
+            "source": "symbol_search",
+            "data": {
+                "query": "SR2701",
+                "count": 1,
+                "candidates": [
+                    {
+                        "symbol": "SR2701",
+                        "name": "SR2701",
+                        "market": "futures",
+                        "type": "future",
+                        "exchange": "CN",
+                        "source": "china_futures",
+                    }
+                ],
+                "sources": {"china_futures": "ok"},
+            },
+        }
+    )
+    ledger = GroundingLedger(run_dir=tmp_path, user_message="获取 SR2701 的行情")
+    ledger.ingest_tool_result(
+        tool_name="search_symbol",
+        arguments={"query": "SR2701"},
+        result=result,
+        call_id="resolve",
+        success=True,
+    )
+
+    assert ledger.identity_status == "locked"
+    assert ledger.authorized_symbols == {"SR2701"}
+
+    authorization = ledger.authorize_tool_call(
+        "get_market_data",
+        {"codes": ["SR2701"]},
+        batch_authorized_symbols=ledger.authorized_symbols,
+        call_id="prices",
+    )
+    assert authorization.allowed is True
+
+
+@pytest.mark.parametrize(
     ("locked", "requested"),
     [
         ("600519.SH", "600519.SS"),

@@ -180,6 +180,39 @@ class TestSymbolSearchSuccess:
         assert "sec_edgar" not in payload["data"]["sources"]
         mock_cik.assert_not_called()
 
+    def test_china_futures_code_resolves_without_a_provider_hit(self):
+        """A CZCE contract resolves to one exact futures candidate.
+
+        Neither eastmoney nor Yahoo carries Chinese futures, so search_symbol
+        used to return 0 candidates; the identity gate then blocked every
+        get_market_data call for the contract.
+        """
+        with patch.object(
+            ss.eastmoney_client, "get_json", return_value={}
+        ), patch.object(
+            ss.yahoo_client, "search", return_value=[]
+        ):
+            out = ss.SymbolSearchTool().execute(query="SR2701.ZCE")
+
+        payload = json.loads(out)
+        assert payload["ok"] is True
+        candidates = payload["data"]["candidates"]
+        assert [c["symbol"] for c in candidates] == ["SR2701.ZCE"]
+        assert candidates[0]["market"] == "futures"
+        assert payload["data"]["sources"]["china_futures"] == "ok"
+
+    def test_china_futures_bare_code_resolves_to_itself(self):
+        """A bare whitelisted contract (SR2701) is an exact assertion too."""
+        with patch.object(
+            ss.eastmoney_client, "get_json", return_value={}
+        ), patch.object(
+            ss.yahoo_client, "search", return_value=[]
+        ):
+            out = ss.SymbolSearchTool().execute(query="SR2701")
+
+        payload = json.loads(out)
+        assert [c["symbol"] for c in payload["data"]["candidates"]] == ["SR2701"]
+
     def test_canadian_query_skips_eastmoney_endpoint(self):
         """A Canadian .V/.TO query fails fast: eastmoney is never contacted."""
         with patch.object(

@@ -125,6 +125,12 @@ _CANONICAL_SYMBOL_RE = re.compile(
     r"[A-Z][A-Z0-9&.-]{0,19}\.(?:US|NS|BO|FX|TO|V)|"
     r"[A-Z0-9]{2,15}(?:-|/)(?:USDT|USDC|USD|BTC|ETH)|"
     r"[A-Z]{2,15}(?:" + "|".join(_JOINED_CRYPTO_QUOTE_SUFFIXES) + r")|"
+    # Chinese futures carrying their venue suffix (SR2701.ZCE, rb2410.SHFE,
+    # IF2512.CFFEX). Their bars are served free by akshare, but symbol search
+    # has no CN-futures source, so without this branch an explicitly named
+    # contract could never lock identity and every get_market_data call was
+    # rejected with identity_conflict.
+    r"[A-Z]{1,2}\d{3,4}\.(?:ZCE|CZCE|DCE|SHFE|SHF|INE|CFFEX|CFX|GFEX|GFE|CZC)|"
     r"\^[A-Z0-9&.\-]{1,20}|"
     r"[A-Z0-9]{2,15}=[FX]"
     r")(?![A-Za-z0-9_])",
@@ -251,6 +257,18 @@ def _infer_venue(symbol: str) -> str | None:
         ".FX": "forex",
         ".TO": "toronto",
         ".V": "tsx_venture",
+        # Chinese futures venues, keyed on the contract's exchange suffix.
+        ".ZCE": "zhengzhou",
+        ".CZCE": "zhengzhou",
+        ".CZC": "zhengzhou",
+        ".SHFE": "shanghai_futures",
+        ".SHF": "shanghai_futures",
+        ".DCE": "dalian",
+        ".CFFEX": "cffex",
+        ".CFX": "cffex",
+        ".INE": "shanghai_energy",
+        ".GFEX": "guangzhou",
+        ".GFE": "guangzhou",
     }
     for suffix, venue in suffixes.items():
         if upper.endswith(suffix):
@@ -307,6 +325,18 @@ def _infer_currency(symbol: str) -> str | None:
         ".BO": "INR",
         ".TO": "CAD",
         ".V": "CAD",
+        # Chinese futures settle in CNY on every venue.
+        ".ZCE": "CNY",
+        ".CZCE": "CNY",
+        ".CZC": "CNY",
+        ".SHFE": "CNY",
+        ".SHF": "CNY",
+        ".DCE": "CNY",
+        ".CFFEX": "CNY",
+        ".CFX": "CNY",
+        ".INE": "CNY",
+        ".GFEX": "CNY",
+        ".GFE": "CNY",
     }
     for suffix, currency in suffixes.items():
         if upper.endswith(suffix):
@@ -339,6 +369,12 @@ def _infer_instrument_type(symbol: str, candidate_type: Any = None) -> str:
     if "index" in raw:
         return "index"
     upper = _normalize_symbol(symbol)
+    # Chinese futures contracts carrying their venue suffix.
+    if re.match(
+        r"^[A-Z]{1,2}\d{3,4}\.(?:ZCE|CZCE|DCE|SHFE|SHF|INE|CFFEX|CFX|GFEX|GFE|CZC)$",
+        upper,
+    ):
+        return "future"
     if upper.endswith("=F"):
         return "future"
     if upper.endswith(".FX"):
