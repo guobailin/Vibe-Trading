@@ -213,6 +213,52 @@ class TestSymbolSearchSuccess:
         payload = json.loads(out)
         assert [c["symbol"] for c in payload["data"]["candidates"]] == ["SR2701"]
 
+    def test_china_futures_product_name_resolves_to_main_continuous(self):
+        """A Chinese product name with futures intent resolves to <product>0."""
+        expected = {
+            "白糖主力": "SR0",
+            "郑商所白糖主力合约": "SR0",
+            "sugar main": "SR0",
+            "甲醇期货": "MA0",
+        }
+        for query, symbol in expected.items():
+            with patch.object(
+                ss.eastmoney_client, "get_json", return_value={}
+            ), patch.object(
+                ss.yahoo_client, "search", return_value=[]
+            ):
+                out = ss.SymbolSearchTool().execute(query=query)
+            payload = json.loads(out)
+            assert [c["symbol"] for c in payload["data"]["candidates"]] == [
+                symbol
+            ], query
+
+    def test_china_futures_product_name_with_delivery_month(self):
+        """A name plus a delivery month resolves to the dated contract."""
+        with patch.object(
+            ss.eastmoney_client, "get_json", return_value={}
+        ), patch.object(
+            ss.yahoo_client, "search", return_value=[]
+        ):
+            out = ss.SymbolSearchTool().execute(query="白糖2701")
+
+        assert [c["symbol"] for c in json.loads(out)["data"]["candidates"]] == [
+            "SR2701"
+        ]
+
+    def test_ambiguous_equity_name_is_not_hijacked_without_futures_intent(self):
+        """苹果 is also Apple Inc.: only an explicit futures marker resolves it."""
+        with patch.object(
+            ss.eastmoney_client, "get_json", return_value={}
+        ), patch.object(
+            ss.yahoo_client, "search", return_value=[]
+        ):
+            bare = json.loads(ss.SymbolSearchTool().execute(query="苹果"))
+            marked = json.loads(ss.SymbolSearchTool().execute(query="苹果主力"))
+
+        assert "china_futures" not in bare["data"]["sources"]
+        assert [c["symbol"] for c in marked["data"]["candidates"]] == ["AP0"]
+
     def test_canadian_query_skips_eastmoney_endpoint(self):
         """A Canadian .V/.TO query fails fast: eastmoney is never contacted."""
         with patch.object(

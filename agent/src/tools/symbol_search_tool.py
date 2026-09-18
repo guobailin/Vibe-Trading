@@ -55,21 +55,174 @@ _CHINA_FUTURES_EXCHANGE_BY_SUFFIX = {
 }
 
 
+# Chinese-futures product names -> product code. Matching lowercases the query
+# and strips whitespace, exchange words and futures-intent markers, so
+# "白糖主力", "郑商所白糖主力合约" and "sugar main" all resolve to SR.
+_CN_FUTURES_NAME_TO_PRODUCT = {
+    # CFFEX financial futures
+    "沪深300": "if", "沪深三百": "if", "csi300": "if",
+    "上证50": "ih", "上证五十": "ih", "sse50": "ih",
+    "中证500": "ic", "中证五百": "ic", "csi500": "ic",
+    "中证1000": "im", "中证一千": "im", "csi1000": "im",
+    "十年期国债": "t", "10年期国债": "t", "十年国债": "t",
+    "五年期国债": "tf", "5年期国债": "tf",
+    "两年期国债": "ts", "2年期国债": "ts",
+    "三十年期国债": "tl", "30年期国债": "tl",
+    # SHFE metals, energy and chemicals
+    "黄金": "au", "gold": "au",
+    "白银": "ag", "silver": "ag",
+    "沪铜": "cu", "铜": "cu", "copper": "cu",
+    "沪铝": "al", "铝": "al", "aluminum": "al", "aluminium": "al",
+    "沪锌": "zn", "锌": "zn", "zinc": "zn",
+    "沪铅": "pb", "铅": "pb", "lead": "pb",
+    "沪镍": "ni", "镍": "ni", "nickel": "ni",
+    "沪锡": "sn", "锡": "sn", "tin": "sn",
+    "不锈钢": "ss",
+    "螺纹钢": "rb", "螺纹": "rb", "rebar": "rb",
+    "热卷": "hc", "热轧卷板": "hc",
+    "纸浆": "sp", "pulp": "sp",
+    "天然橡胶": "ru", "橡胶": "ru", "rubber": "ru",
+    "氧化铝": "ao", "alumina": "ao",
+    "丁二烯橡胶": "br",
+    "国际铜": "bc",
+    "原油": "sc", "crudeoil": "sc",
+    "燃料油": "fu", "燃油": "fu",
+    "低硫燃料油": "lu",
+    "沥青": "bu", "bitumen": "bu",
+    "20号胶": "nr",
+    # DCE agriculture and chemicals
+    "铁矿石": "i", "铁矿": "i", "ironore": "i",
+    "焦炭": "j", "coke": "j",
+    "焦煤": "jm", "cokingcoal": "jm",
+    "豆粕": "m", "soybeanmeal": "m",
+    "豆油": "y", "soybeanoil": "y",
+    "豆一": "a", "黄豆一号": "a",
+    "豆二": "b", "黄豆二号": "b",
+    "棕榈油": "p", "palmoil": "p",
+    "玉米": "c", "corn": "c",
+    "玉米淀粉": "cs", "淀粉": "cs",
+    "鸡蛋": "jd", "egg": "jd",
+    "生猪": "lh", "livehog": "lh",
+    "聚丙烯": "pp", "polypropylene": "pp",
+    "塑料": "l", "聚乙烯": "l", "polyethylene": "l",
+    "聚氯乙烯": "v", "pvc": "v",
+    "乙二醇": "eg",
+    "苯乙烯": "eb",
+    "液化石油气": "pg", "lpg": "pg",
+    "粳米": "rr",
+    "原木": "lg",
+    # CZCE
+    "白糖": "sr", "白砂糖": "sr", "sugar": "sr",
+    "棉花": "cf", "cotton": "cf",
+    "pta": "ta", "精对苯二甲酸": "ta",
+    "甲醇": "ma", "methanol": "ma",
+    "玻璃": "fg", "glass": "fg",
+    "菜粕": "rm", "菜籽粕": "rm", "rapeseedmeal": "rm",
+    "菜油": "oi", "菜籽油": "oi", "rapeseedoil": "oi",
+    "纯碱": "sa", "sodaash": "sa",
+    "尿素": "ur", "urea": "ur",
+    "苹果": "ap", "apple": "ap",
+    "红枣": "cj", "jujube": "cj",
+    "花生": "pk", "peanut": "pk",
+    "硅铁": "sf", "ferrosilicon": "sf",
+    "锰硅": "sm", "silicomanganese": "sm",
+    "动力煤": "zc", "thermalcoal": "zc",
+    "棉纱": "cy", "cottonyarn": "cy",
+    "菜籽": "rs", "rapeseed": "rs",
+    "对二甲苯": "px",
+    "烧碱": "sh", "causticsoda": "sh",
+    "瓶片": "pr",
+    "短纤": "pf", "涤纶短纤": "pf",
+    # GFEX
+    "工业硅": "si", "industrialsilicon": "si",
+    "碳酸锂": "lc", "lithiumcarbonate": "lc",
+    "多晶硅": "ps", "polysilicon": "ps",
+}
+
+# Words that state futures intent. A plain product name only resolves when one
+# of these (or a delivery month) is present, so an equity name that collides
+# with a product ("苹果" = Apple Inc.) still resolves through the equity
+# providers instead of being hijacked by the futures branch.
+_CN_FUTURES_MARKER_WORDS = (
+    "主力合约", "主力", "主连", "连续", "当月连续",
+    "期货", "合约", "main", "continuous", "cont", "futures",
+)
+
+# Exchange words are removed before the product lookup. Latin tokens are only
+# stripped as a prefix/suffix so a product name that merely contains one (e.g.
+# "alumina" contains "ina", not "ine") is never corrupted.
+_CN_FUTURES_EXCHANGE_WORDS = (
+    "郑州商品交易所", "上海期货交易所", "大连商品交易所",
+    "中国金融期货交易所", "广州期货交易所", "上海国际能源交易中心",
+    "郑商所", "上期所", "大商所", "中金所", "广期所", "能源中心",
+    "czce", "zce", "shfe", "dce", "cffex", "gfex", "ine",
+)
+
+# Filler that carries no product identity.
+_CN_FUTURES_FILLER_WORDS = (
+    "最新行情", "行情", "走势", "价格", "最新", "现价", "日线", "数据", "的",
+)
+
+
+def _china_futures_name_contract(query: str) -> str | None:
+    """Resolve a product name to a contract code, or None.
+
+    Returns the main continuous contract (SR0) when the query states futures
+    intent without a delivery month, and the dated contract (SR2701) when a
+    three/four-digit delivery month is present.
+    """
+    text = re.sub(r"\s+", "", str(query or "")).lower()
+    if not text:
+        return None
+    has_marker = any(word in text for word in _CN_FUTURES_MARKER_WORDS)
+    for word in _CN_FUTURES_EXCHANGE_WORDS:
+        if word.isascii():
+            if text.startswith(word):
+                text = text[len(word):]
+            elif text.endswith(word):
+                text = text[: -len(word)]
+        else:
+            text = text.replace(word, "")
+    for word in _CN_FUTURES_MARKER_WORDS:
+        text = text.replace(word, "")
+    for word in _CN_FUTURES_FILLER_WORDS:
+        text = text.replace(word, "")
+    if not text:
+        return None
+
+    product = _CN_FUTURES_NAME_TO_PRODUCT.get(text)
+    delivery: str | None = None
+    if product is None:
+        # "白糖2701": product name plus an explicit delivery month.
+        matched = re.fullmatch(r"(.+?)(\d{3,4})", text)
+        if matched:
+            product = _CN_FUTURES_NAME_TO_PRODUCT.get(matched.group(1))
+            delivery = matched.group(2)
+    if product is None:
+        return None
+    if delivery is None and not has_marker:
+        return None
+    return f"{product.upper()}{delivery or '0'}"
+
+
 def _china_futures_query(query: str) -> str | None:
-    """Return the canonical CN futures code when the query is one, else None.
+    """Return the canonical CN futures code when the query names one, else None.
 
     Chinese futures are absent from every provider this tool fans out to
     (eastmoney, Yahoo, ccxt), so a contract query matched nothing and the
-    grounding ledger could never lock an identity for it. The contract code
-    itself is an exact instrument assertion, so it resolves deterministically
-    here without a network call.
+    grounding ledger could never lock an identity for it. A contract code, or a
+    product name carrying futures intent, is an exact instrument assertion and
+    resolves deterministically here without a network call.
     """
     from backtest.engines._market_hooks import _is_china_futures
 
-    text = str(query or "").strip().upper()
-    if not text or any(ch.isspace() for ch in text):
+    text = str(query or "").strip()
+    if not text:
         return None
-    return text if _is_china_futures(text) else None
+    code = text.upper()
+    if not any(ch.isspace() for ch in code) and _is_china_futures(code):
+        return code
+    return _china_futures_name_contract(text)
 
 
 def _china_futures_exchange(contract: str) -> str:
@@ -359,13 +512,15 @@ class SymbolSearchTool(BaseTool):
 
         china_futures = _china_futures_query(query)
         if china_futures is not None:
-            # A contract code is an exact instrument assertion: append the
-            # deterministic candidate and drop near-string provider hits, the
-            # same way the crypto / FX / =F branches above do.
+            # A contract code, or a product name carrying futures intent, is an
+            # exact instrument assertion: append the deterministic candidate and
+            # drop near-string provider hits, the same way the crypto / FX / =F
+            # branches above do. The candidate keeps the query as its name so the
+            # ledger's exact-match step can pick it for a name query too.
             candidates.append(
                 {
                     "symbol": china_futures,
-                    "name": china_futures,
+                    "name": str(query).strip(),
                     "market": "futures",
                     "type": "future",
                     "exchange": _china_futures_exchange(china_futures),

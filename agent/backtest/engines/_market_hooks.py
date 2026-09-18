@@ -29,14 +29,22 @@ from backtest.models import Position
 # before lookup so callers can pass any case (``RB2410`` and ``rb2410``
 # both resolve correctly).
 _CN_FUTURES_PRODUCTS = {
+    # CFFEX financial futures
     "if", "ic", "ih", "im", "t", "tf", "ts", "tl",
+    # SHFE metals, energy and chemicals
     "au", "ag", "cu", "al", "zn", "pb", "ni", "sn", "ss",
-    "rb", "hc", "i", "j", "jm",
+    "rb", "hc", "sp", "ru", "ao", "br", "bc",
     "sc", "fu", "lu", "bu", "nr",
-    "c", "cs", "m", "y", "a", "p", "jd", "lh",
-    "cf", "sr", "ta", "ma", "ap", "rm", "oi",
-    "pp", "l", "v", "eg", "eb", "pf", "sa", "fg", "ur",
-    "si", "lc",
+    # DCE agriculture and chemicals
+    "c", "cs", "m", "y", "a", "b", "p", "jd", "lh",
+    "pp", "l", "v", "eg", "eb", "pg", "rr", "lg",
+    "i", "j", "jm",
+    # CZCE
+    "cf", "sr", "ta", "ma", "ap", "rm", "oi", "cj", "pk",
+    "pf", "sa", "fg", "ur", "sf", "sm", "zc", "cy", "rs",
+    "px", "sh", "pr",
+    # GFEX
+    "si", "lc", "ps",
 }
 
 
